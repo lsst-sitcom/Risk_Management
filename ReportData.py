@@ -277,10 +277,8 @@ def analyze(issues,issues_mit,jira):
 	date_style = openpyxl.styles.NamedStyle(name='datetime', number_format='DD/MM/YYYY')
 	ws = wb["Table 7"]
 	for cell in ws['E:E']:
-		cell.style = date_style
-	ws['E1'].font = openpyxl.styles.Font(size=9)
-	ws['E1'].fill = openpyxl.styles.PatternFill("solid",fgColor="8DB4E2")
-	ws['E1'].alignment = openpyxl.styles.Alignment(horizontal='center',vertical='center')
+		if cell.value != "Trigger Date":
+			cell.style = date_style
 	wb.save(filename=filename)
 
 
