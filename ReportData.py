@@ -46,11 +46,11 @@ def connect():
 	#	return
 
 	# query JIRA with the above query
-	print("\nQuerying JIRA with string: \n\n" + query)
+	print("\nQuerying JIRA for Risk/Opportunities: \n\n" + query)
 	issues = jira.search_issues(query,maxResults=None)
 
 	# query JIRA with the above query_mit
-	print("\nQuerying JIRA with string: \n\n" + query_mit)
+	print("\nQuerying JIRA for Mitigations: \n\n" + query_mit)
 	issues_mit= jira.search_issues(query_mit,maxResults=None)
 
 	analyze(issues,issues_mit,jira)
@@ -81,14 +81,19 @@ def analyze(issues,issues_mit,jira):
 		if iType != 'RM-Risk':
 			PWEa = 0
 			isParent = 'False'
+			monthsAfterMit = 0
+			scheduleRecoverable = "N/A"
 		else:
 			PWEa = issues[i].fields.customfield_14802
 			isParent = issues[i].fields.customfield_15104.value
+			monthsAfterMit = issues[i].fields.customfield_14805
+			scheduleRecoverable = issues[i].fields.customfield_13405
 			if isParent == 'True':
 				id_p = str(issues[i].key) + '(P)'
 
 		data.append({'JIRA ID':issues[i].key,
 			'Parent':isParent,
+			'JIRA ID (Parent)':id_p,
 			'Summary':issues[i].fields.summary,
 			'issue_type':issues[i].fields.issuetype.name,
 			'description':issues[i].fields.description,
@@ -99,6 +104,7 @@ def analyze(issues,issues_mit,jira):
 			'Nonlabor Cost':issues[i].fields.customfield_13404,
 			'Labor Cost':issues[i].fields.customfield_13606,
 			'Model':str(issues[i].fields.customfield_13107),
+			'Schedule Recoverable':scheduleRecoverable,
 			'Trigger Date':issues[i].fields.customfield_13108,
 			'Review Date':issues[i].fields.updated,
 			'Random Period':issues[i].fields.customfield_13111,
@@ -107,8 +113,8 @@ def analyze(issues,issues_mit,jira):
 			'WBS':issues[i].fields.customfield_12914,
 			'Proposed Management Response':issues[i].fields.customfield_13501,
 			'score':int(float(issues[i].fields.customfield_13900)),
-			'JIRA ID (Parent)':id_p,
-			'Mitigated By':issues[i].fields.customfield_13801
+			'Mitigated By':issues[i].fields.issuelinks,
+			'Expected Months After Mitigation':monthsAfterMit
 			})
 
 	# iterate through the list of returned mitigation issues, pulling out the relevant data, one issue per row
@@ -127,7 +133,7 @@ def analyze(issues,issues_mit,jira):
 			'FTEs Required':issues_mit[i].fields.customfield_13407,
 			'Anticipated Completion Date':issues_mit[i].fields.customfield_13114,
 			'Review Date':issues_mit[i].fields.updated,
-			'Risks Mitigated':issues_mit[i].fields.customfield_15800
+			'Risks Mitigated':issues_mit[i].fields.issuelinks
 			})
 
 	# iterate through and add "nonlabor PWE", "labor PWE" entries, mitigation keys
@@ -144,7 +150,9 @@ def analyze(issues,issues_mit,jira):
 		if data[i]['Mitigated By'] != None:
 			keys = []
 			for j in range(len(data[i]['Mitigated By'])):
-				keys.append(data[i]['Mitigated By'][j].key)
+				link = data[i]['Mitigated By'][j]
+				if link.type.name == "Risk Mitigation":
+					keys.append(link.inwardIssue.key)
 			data[i]['Mitigated By'] = ', '.join(keys)
 
 	# iterate through and add mitigated risks keys
@@ -152,7 +160,10 @@ def analyze(issues,issues_mit,jira):
 		if data_mit[i]['Risks Mitigated'] != None:
 			keys = []
 			for j in range(len(data_mit[i]['Risks Mitigated'])):
-				keys.append(data_mit[i]['Risks Mitigated'][j].key)
+				link_mit = data_mit[i]['Risks Mitigated'][j]
+				if link_mit.type.name == "Risk Mitigation":
+					keys.append(link_mit.outwardIssue.key)
+				#keys.append(data_mit[i]['Risks Mitigated'][j].key)
 			data_mit[i]['Risks Mitigated'] = ', '.join(keys)
 
 	# convert to pandas dataframe
